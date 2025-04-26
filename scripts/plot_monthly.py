@@ -12,6 +12,9 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
 def plot_prices(df):
+    # Calculamos la Media Móvil de 7 días
+    df["sma_7"] = df["price"].rolling(window=7, center=True).mean()
+
     # Evaluamos tendencia general
     is_bullish = df["price"].iloc[-1] > df["price"].iloc[0]
     line_color = '#00FF7F' if is_bullish else '#FF4C4C'  # Verde lima o rojo coral
@@ -21,8 +24,11 @@ def plot_prices(df):
     ax.set_facecolor('#111111')         # Fondo gráfico
     fig.patch.set_facecolor('#111111')  # Fondo ventana
 
-    # Gráfico principal
-    ax.plot(df["date"], df["price"], color=line_color, linewidth=2.5)
+    # Gráfico principal - Precio
+    ax.plot(df["date"], df["price"], color=line_color, linewidth=2.5, label="Precio BTC")
+
+    # Gráfico Media Móvil
+    ax.plot(df["date"], df["sma_7"], color="#1E90FF", linestyle="--", linewidth=2, label="SMA 7 días")
 
     # Ejes minimalistas
     ax.tick_params(axis='x', colors='white', labelsize=9)
@@ -43,10 +49,14 @@ def plot_prices(df):
     ax.set_xlabel("")
     ax.set_ylabel("")
 
+    # Añadimos leyenda elegante
+    legend = ax.legend(loc="upper left", fontsize=10)
+    for text in legend.get_texts():
+        text.set_color("white")
+
     # Margen automático
     plt.tight_layout()
     plt.show()
-
 
 if __name__ == "__main__":
     df = load_csv()
