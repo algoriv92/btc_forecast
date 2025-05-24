@@ -2,11 +2,12 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+import plotly.graph_objects as go
 import os
 
 # Cargar datos
 def load_csv(filename):
-    base_dir = os.path.dirname(os.path.dirname(__file__))  # 🛠️ 2 niveles hacia arriba
+    base_dir = os.path.dirname(os.path.dirname(__file__))
     data_path = os.path.join(base_dir, "data", filename)
     return pd.read_csv(data_path, parse_dates=["date"])
 
@@ -14,72 +15,96 @@ def load_csv(filename):
 def plot_daily(df):
     df["sma_7"] = df["price"].rolling(window=7).mean()
 
-    fig, ax = plt.subplots(figsize=(12, 5))
-    ax.set_facecolor('#111111')
-    fig.patch.set_facecolor('#111111')
+    fig = go.Figure()
 
-    is_bullish = df["price"].iloc[-1] > df["price"].iloc[0]
-    line_color = '#00FF7F' if is_bullish else '#FF4C4C'
+    fig.add_trace(go.Scatter(
+        x=df["date"], y=df["price"],
+        mode='lines',
+        name='Precio BTC',
+        line=dict(color='#00FF7F', width=2)
+    ))
 
-    ax.plot(df["date"], df["price"], color=line_color, linewidth=2.5, label="Precio BTC")
-    ax.plot(df["date"], df["sma_7"], color="#1E90FF", linestyle="--", linewidth=2, label="SMA 7 días")
+    fig.add_trace(go.Scatter(
+        x=df["date"], y=df["sma_7"],
+        mode='lines',
+        name='SMA 7 días',
+        line=dict(color='#1E90FF', width=2, dash='dash')
+    ))
 
-    ax.tick_params(axis='x', colors='white', labelsize=9)
-    ax.tick_params(axis='y', colors='white', labelsize=9)
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['left'].set_color('#444444')
-    ax.spines['bottom'].set_color('#444444')
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%d %b'))
-    plt.xticks(rotation=45)
-    ax.set_title("Bitcoin - Últimos 30 días", fontsize=14, color='white', pad=15)
+    fig.update_layout(
+        plot_bgcolor='#111111',
+        paper_bgcolor='#111111',
+        font_color='white',
+        title='Bitcoin - Últimos 30 días',
+        xaxis_title='Fecha',
+        yaxis_title='Precio (€)',
+        hovermode='x unified',
+    )
 
-    legend = ax.legend(loc="upper left", fontsize=10)
-    for text in legend.get_texts():
-        text.set_color("white")
-
-    plt.tight_layout()
-    st.pyplot(fig)
+    st.plotly_chart(fig, use_container_width=True)
 
 # Función para graficar precios intradía
 def plot_hourly(df):
     df["sma_24h"] = df["price"].rolling(window=24).mean()
 
-    fig, ax = plt.subplots(figsize=(12, 5))
-    ax.set_facecolor('#111111')
-    fig.patch.set_facecolor('#111111')
+    fig = go.Figure()
 
-    ax.plot(df["date"], df["price"], color="#00FF7F", linewidth=2.0, label="Precio BTC (1H)")
-    ax.plot(df["date"], df["sma_24h"], color="#1E90FF", linestyle="--", linewidth=2, label="SMA 24h")
+    fig.add_trace(go.Scatter(
+        x=df["date"], y=df["price"],
+        mode='lines',
+        name='Precio BTC (1H)',
+        line=dict(color='#00FF7F', width=2)
+    ))
 
-    ax.tick_params(axis='x', colors='white', labelsize=8)
-    ax.tick_params(axis='y', colors='white', labelsize=8)
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['left'].set_color('#444444')
-    ax.spines['bottom'].set_color('#444444')
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%d %b %Hh'))
-    plt.xticks(rotation=45)
-    ax.set_title("Bitcoin - Última semana (1H)", fontsize=14, color='white', pad=15)
+    fig.add_trace(go.Scatter(
+        x=df["date"], y=df["sma_24h"],
+        mode='lines',
+        name='SMA 24h',
+        line=dict(color='#1E90FF', width=2, dash='dash')
+    ))
 
-    legend = ax.legend(loc="upper left", fontsize=10)
-    for text in legend.get_texts():
-        text.set_color("white")
+    fig.update_layout(
+        plot_bgcolor='#111111',
+        paper_bgcolor='#111111',
+        font_color='white',
+        title='Bitcoin - Última semana (1H)',
+        xaxis_title='Fecha y Hora',
+        yaxis_title='Precio (€)',
+        hovermode='x unified',
+    )
 
-    plt.tight_layout()
-    st.pyplot(fig)
+    st.plotly_chart(fig, use_container_width=True)
+
+# Función para calcular métricas principales
+def show_metrics(df):
+    # Precio actual
+    current_price = df["price"].iloc[-1]
+
+    # Cambio en 24h
+    price_24h_ago = df[df["date"] >= (df["date"].iloc[-1] - pd.Timedelta(hours=24))]["price"].iloc[0]
+    change_24h = ((current_price - price_24h_ago) / price_24h_ago) * 100
+
+    # Volatilidad semanal (desviación estándar de 7 días)
+    volatility_week = df["price"].pct_change().rolling(window=24*7).std().mean() * 100  # en porcentaje
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Precio Actual (EUR)", f"{current_price:,.2f} €")
+    col2.metric("Cambio 24h", f"{change_24h:.2f} %")
+    col3.metric("Volatilidad Semanal", f"{volatility_week:.2f} %")
 
 # Streamlit App
 st.set_page_config(page_title="BTC Forecast", layout="wide")
 
-st.title("📈 BTC Forecast Dashboard")
+st.title("BTC Forecast Dashboard")
 st.markdown("Visualiza la evolución reciente de Bitcoin en dos modos distintos:")
 
 mode = st.selectbox("Selecciona el modo de visualización:", ("Últimos 30 días (diario)", "Última semana (1H)"))
 
 if mode == "Últimos 30 días (diario)":
     df_daily = load_csv("btc_prices.csv")
+    show_metrics(df_daily)
     plot_daily(df_daily)
 else:
     df_hourly = load_csv("btc_hourly.csv")
+    show_metrics(df_hourly)
     plot_hourly(df_hourly)
